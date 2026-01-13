@@ -189,7 +189,9 @@ class _CockpitViewState extends State<CockpitView> {
 
   void _initMcpConnection() {
     final host = widget.planet.url.split(':').first;
-    final mcpUrl = 'ws://$host:8000/ws/mcp';
+    // Token Mocked para Fase 4 Hardening (sub: orbit_commander)
+    const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvcmJpdF9jb21tYW5kZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.XPb_tU6u_k5_m5-yL9y-D8p-x_S-v_T-v_T-v_T-v_T"; 
+    final mcpUrl = 'ws://$host:8000/ws/mcp?token=$mockToken';
     
     try {
       mcpChannel = WebSocketChannel.connect(Uri.parse(mcpUrl));

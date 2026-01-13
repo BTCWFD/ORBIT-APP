@@ -1,0 +1,11 @@
+.env
+*.log
+orbit_data/
+__pycache__/
+*.pyc
+.DS_Store
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages

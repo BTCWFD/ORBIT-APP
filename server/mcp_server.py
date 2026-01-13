@@ -1,64 +1,75 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import os
 import json
+import jwt
 import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
+from dotenv import load_dotenv
+
+# Cargar configuración desde .env
+load_dotenv()
+SECRET_KEY = os.getenv("MCP_SECRET", "default_secret_fallback")
+ALGORITHM = "HS256"
 
 app = FastAPI()
 
-# Estado global del agente (Simulado para PoC Fase 2)
+# Estado global del agente (Thread-safe Lock)
 agent_state = {
     "status": "IDLE",
     "current_task": "Waiting for commands...",
-    "pending_approvals": []
 }
+state_lock = asyncio.Lock()
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
 
-    async city_connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async broadcast(self, message: str):
+    async def broadcast(self, message: str):
         for connection in self.active_connections:
-            await connection.send_text(message)
+            try:
+                await connection.send_text(message)
+            except:
+                pass
 
 manager = ConnectionManager()
 
-@app.get("/")
-async def get():
-    return {"status": "Orbit MCP Server Operational"}
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub") == "orbit_commander"
+    except:
+        return False
 
 @app.websocket("/ws/mcp")
 async def mcp_endpoint(websocket: WebSocket):
-    await manager.city_connect(websocket)
+    # Handshake authentication
+    token = websocket.query_params.get("token")
+    if not token or not verify_token(token):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await manager.connect(websocket)
     try:
-        # Enviar estado inicial
         await websocket.send_text(json.dumps({"type": "STATE_UPDATE", "data": agent_state}))
         
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
             
-            # Procesar comandos del Protocolo de Contexto de Modelo
-            if message["type"] == "HALT_SIGNAL":
-                agent_state["status"] = "HALTED"
-                agent_state["current_task"] = "EMERGENCY STOP ACTIVATED"
-                await manager.broadcast(json.dumps({"type": "ALERT", "msg": "SISTEMA CONGELADO POR SEÑAL DE PÁNICO"}))
-            
-            elif message["type"] == "APPROVE_CMD":
-                cmd_id = message["cmd_id"]
-                # Lógica para marcar comando como aprobado...
-                await manager.broadcast(json.dumps({"type": "LOG", "msg": f"Comando {cmd_id} aprobado por el humano."}))
-
-            # Broadcast del nuevo estado
-            await manager.broadcast(json.dumps({"type": "STATE_UPDATE", "data": agent_state}))
+            async with state_lock:
+                if message["type"] == "HALT_SIGNAL":
+                    agent_state["status"] = "HALTED"
+                    agent_state["current_task"] = "EMERGENCY STOP ACTIVATED"
+                    await manager.broadcast(json.dumps({"type": "ALERT", "msg": "SISTEMA PROTEGIDO: AGENTES CONGELADOS"}))
+                
+                # Actualizar a todos con el nuevo estado verificado
+                await manager.broadcast(json.dumps({"type": "STATE_UPDATE", "data": agent_state}))
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

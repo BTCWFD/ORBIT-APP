@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip node.js npm \
     && apt-get clean
 
-RUN pip3 install fastapi uvicorn
+RUN pip3 install fastapi uvicorn pyjwt python-dotenv
 
 # Install KasmVNC
 RUN wget https://github.com/kasmtech/KasmVNC/releases/download/v1.3.1/kasmvncserver_jammy_1.3.1_amd64.deb \
