@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:ui';
+import 'dart:convert';
 
 void main() {
   runApp(const OrbitApp());
@@ -38,10 +40,18 @@ class CockpitView extends StatefulWidget {
 
 class _CockpitViewState extends State<CockpitView> {
   late final WebViewController controller;
+  WebSocketChannel? mcpChannel;
+  
   bool isConnected = false;
   bool showKeyboard = true;
+  bool showStatusDeck = false;
   double loadingProgress = 0;
-  final TextEditingController urlController = TextEditingController(text: 'http://localhost:6901');
+  
+  // MCP State
+  String agentStatus = "OFFLINE";
+  String currentTask = "No active connection";
+  
+  final TextEditingController urlController = TextEditingController(text: 'localhost:6901');
 
   @override
   void initState() {
@@ -61,6 +71,7 @@ class _CockpitViewState extends State<CockpitView> {
             setState(() {
               isConnected = true;
             });
+            _initMcpConnection();
           },
           onWebResourceError: (WebResourceError error) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -69,6 +80,40 @@ class _CockpitViewState extends State<CockpitView> {
           },
         ),
       );
+  }
+
+  void _initMcpConnection() {
+    // La IP del MCP server suele ser la misma que la del VNC pero en puerto 8000
+    final host = urlController.text.split(':').first;
+    final mcpUrl = 'ws://$host:8000/ws/mcp';
+    
+    try {
+      mcpChannel = WebSocketChannel.connect(Uri.parse(mcpUrl));
+      mcpChannel!.stream.listen((message) {
+        final decoded = json.decode(message);
+        if (decoded['type'] == 'STATE_UPDATE') {
+          setState(() {
+            agentStatus = decoded['data']['status'];
+            currentTask = decoded['data']['current_task'];
+          });
+        } else if (decoded['type'] == 'ALERT') {
+          _showSystemAlert(decoded['msg']);
+        }
+      }, onError: (err) {
+        setState(() { agentStatus = "MCP ERROR"; });
+      });
+    } catch (e) {
+      debugPrint("Fallo conexión MCP: $e");
+    }
+  }
+
+  void _showSystemAlert(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
+      )
+    );
   }
 
   void _connect() {
@@ -82,28 +127,29 @@ class _CockpitViewState extends State<CockpitView> {
   }
 
   void _panicAction() {
-    // Lógica de Pánico: Simulación de parada de emergencia de agentes.
-    // En la Fase 2, esto enviará una señal via MCP (Model Context Protocol).
+    // Enviamos señal real al servidor MCP
+    mcpChannel?.sink.add(json.encode({"type": "HALT_SIGNAL"}));
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.red.shade900,
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.white),
+            Icon(Icons.bolt, color: Colors.yellowAccent),
             SizedBox(width: 10),
-            Text('PROTOCOLO DE PÁNICO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text('PÁNICO ENVIADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
         content: const Text(
-          'Se ha enviado una señal de interrupción inmediata a todos los agentes activos en el Planeta. '
-          'La ejecución se ha congelado.',
+          'Se ha enviado la señal de interrupción al Planeta vía MCP. '
+          'Todos los agentes de IA han sido forzados a HALT.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ENTENDIDO', style: TextStyle(color: Colors.white)),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -111,11 +157,17 @@ class _CockpitViewState extends State<CockpitView> {
   }
 
   @override
+  void dispose() {
+    mcpChannel?.sink.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('ORBIT COCKPIT v1.0', 
+        title: const Text('ORBIT COCKPIT v2.0', 
           style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold, fontSize: 13)),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -127,18 +179,17 @@ class _CockpitViewState extends State<CockpitView> {
         ),
         actions: [
           IconButton(
-            icon: Icon(showKeyboard ? Icons.keyboard_hide : Icons.keyboard, color: Colors.cyanAccent),
-            onPressed: () => setState(() => showKeyboard = !showKeyboard),
+            icon: Icon(Icons.analytics_outlined, color: showStatusDeck ? Colors.cyanAccent : Colors.white70),
+            onPressed: () => setState(() => showStatusDeck = !showStatusDeck),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
-            onPressed: () => controller.reload(),
+            icon: Icon(showKeyboard ? Icons.keyboard_hide : Icons.keyboard, color: Colors.white70),
+            onPressed: () => setState(() => showKeyboard = !showKeyboard),
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Background Aesthetic
           Container(
             decoration: const BoxDecoration(
               gradient: RadialGradient(
@@ -153,12 +204,10 @@ class _CockpitViewState extends State<CockpitView> {
             child: Column(
               children: [
                 if (loadingProgress > 0 && loadingProgress < 1)
-                  LinearProgressIndicator(
-                    value: loadingProgress, 
-                    backgroundColor: Colors.white10,
-                    color: Colors.cyanAccent
-                  ),
+                  LinearProgressIndicator(value: loadingProgress, backgroundColor: Colors.white10, color: Colors.cyanAccent),
                 
+                _buildSystemStatusStrip(),
+
                 Expanded(
                   child: Container(
                     margin: isConnected ? EdgeInsets.zero : const EdgeInsets.all(10),
@@ -173,12 +222,64 @@ class _CockpitViewState extends State<CockpitView> {
                   ),
                 ),
                 
+                if (showStatusDeck && isConnected) _buildAgentStatusDeck(),
                 if (showKeyboard && isConnected) _buildDevKeyboard(),
               ],
             ),
           ),
 
           if (!isConnected) _buildConnectionOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemStatusStrip() {
+    if (!isConnected) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: Colors.black45,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                  color: agentStatus == "HALTED" ? Colors.red : Colors.greenAccent,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: agentStatus == "HALTED" ? Colors.red : Colors.greenAccent, blurRadius: 4)]
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('AGENTE: $agentStatus', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+            ],
+          ),
+          const Text('ENLACE: ESTABLE', style: TextStyle(fontSize: 10, color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgentStatusDeck() {
+    return Container(
+      height: 120,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11224D).withOpacity(0.9),
+        border: const Border(top: BorderSide(color: Colors.cyanAccent, width: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('OBSERVATION DECK', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+          const Divider(color: Colors.cyanAccent, thickness: 0.5),
+          const SizedBox(height: 8),
+          Text('TAREA ACTUAL:', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5))),
+          const SizedBox(height: 4),
+          Text(currentTask, style: const TextStyle(fontSize: 14, fontFamily: 'monospace', color: Colors.white)),
         ],
       ),
     );
@@ -205,11 +306,7 @@ class _CockpitViewState extends State<CockpitView> {
                   children: [
                     const Icon(Icons.rocket_launch, size: 64, color: Colors.cyanAccent),
                     const SizedBox(height: 20),
-                    const Text('ENLACE DE SATÉLITE', 
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                    const SizedBox(height: 10),
-                    Text('Proyecto Orbit v1.0', 
-                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.5))),
+                    const Text('ORBIT MISSION CONTROL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2)),
                     const SizedBox(height: 32),
                     TextField(
                       controller: urlController,
@@ -217,13 +314,9 @@ class _CockpitViewState extends State<CockpitView> {
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.black26,
-                        labelText: 'URL del Planeta (Cloudflare / Local)',
+                        labelText: 'ID del Planeta (IP o URL)',
                         labelStyle: const TextStyle(color: Colors.white54),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.cyanAccent),
-                        ),
                         prefixIcon: const Icon(Icons.link, color: Colors.cyanAccent),
                       ),
                     ),
@@ -235,19 +328,12 @@ class _CockpitViewState extends State<CockpitView> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.cyanAccent,
                           foregroundColor: Colors.black,
-                          elevation: 10,
-                          shadowColor: Colors.cyanAccent.withOpacity(0.5),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: _connect,
-                        child: const Text('INICIAR SECUENCIA DE CONEXIÓN', 
-                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                        child: const Text('ENGAGE LINK', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Asegúrate de que el túnel esté activo en Docker',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: Colors.white38)),
                   ],
                 ),
               ),
@@ -264,7 +350,6 @@ class _CockpitViewState extends State<CockpitView> {
       decoration: BoxDecoration(
         color: const Color(0xFF0D1117),
         border: Border(top: BorderSide(color: Colors.cyanAccent.withOpacity(0.2))),
-        boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -278,48 +363,26 @@ class _CockpitViewState extends State<CockpitView> {
                 _DevKey(label: 'ALT', onPressed: () {}),
                 _DevKey(label: 'TAB', onPressed: () {}),
                 _DevKey(label: 'CMD', onPressed: () {}),
-                _DevKey(label: 'P', color: Colors.cyanAccent.withOpacity(0.1), onPressed: () {}), // Ctrl+P sim
-                _DevKey(label: 'F1', onPressed: () {}),
-                _DevKey(label: 'F12', onPressed: () {}),
-                _DevKey(label: '/', onPressed: () {}),
-                _DevKey(label: '|', onPressed: () {}),
+                _DevKey(label: 'P', color: Colors.cyanAccent.withOpacity(0.1), onPressed: () {}),
+                _DevKey(label: 'UNDO', onPressed: () {}),
+                _DevKey(label: 'SAVE', onPressed: () {}),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withOpacity(0.2),
-                          blurRadius: 10,
-                          spreadRadius: 1
-                        )
-                      ]
-                    ),
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade900,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 5,
-                      ),
-                      onPressed: _panicAction,
-                      icon: const Icon(Icons.bolt, color: Colors.yellowAccent),
-                      label: const Text('PROTOCOLO DE PÁNICO', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade900,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              _DevKey(label: 'UNDO', onPressed: () {}),
-              _DevKey(label: 'SAVE', onPressed: () {}),
-            ],
+              onPressed: _panicAction,
+              icon: const Icon(Icons.bolt, color: Colors.yellowAccent),
+              label: const Text('EMERGENCY HALT (PANIC)', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
