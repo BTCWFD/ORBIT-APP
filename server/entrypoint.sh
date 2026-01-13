@@ -17,6 +17,9 @@ fi
 # Iniciar code-server en segundo plano
 code-server --auth none --bind-addr 127.0.0.1:8080 /home/orbituser &
 
+# Iniciar MCP Server en segundo plano
+python3 /home/orbituser/mcp_server.py &
+
 # Ejecutar KasmVNC con XFCE
 # -fg mantiene el proceso en primer plano para el contenedor
 vncserver :1 -name "OrbitPlanet" -geometry 1280x720 -localhost no -SecurityTypes VNCAuth -PasswordFile /home/orbituser/.vnc/passwd

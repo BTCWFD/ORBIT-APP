@@ -10,6 +10,7 @@ services:
     ports:
       - "6901:6901" # KasmVNC (Control de Misión local)
       - "8080:8080" # code-server (Acceso IDE local)
+      - "8000:8000" # MCP Server (API Agéntica)
     volumes:
       - orbit_data:/home/orbituser
     restart: unless-stopped
