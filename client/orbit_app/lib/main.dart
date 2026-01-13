@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'dart:convert';
 import '../models/planet.dart';
@@ -19,8 +20,15 @@ class OrbitApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: Colors.deepPurple,
+        primaryColor: const Color(0xFF00FFFF),
         scaffoldBackgroundColor: const Color(0xFF020205),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+          primary: const Color(0xFF00FFFF),
+          secondary: Colors.deepPurpleAccent,
+        ),
+        textTheme: GoogleFonts.orbitronTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
       ),
       home: const HomeDashboard(),
@@ -43,7 +51,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   void _deployNewPlanet() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Iniciando despliegue de instancia en Google Cloud...')),
+      const SnackBar(
+        content: Text('Iniciando despliegue de instancia en Google Cloud...'),
+        backgroundColor: Colors.deepPurple,
+      ),
     );
   }
 
@@ -52,13 +63,27 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background
+          // Fondo Orbital
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: NetworkImage('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop'),
+                image: AssetImage('assets/bg_mission_control.png'),
                 fit: BoxFit.cover,
-                opacity: 0.1,
+                opacity: 0.3,
+              ),
+            ),
+          ),
+          // Gradient Overlay
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.9),
+                ],
               ),
             ),
           ),
@@ -71,26 +96,60 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('ORBIT CLOUD', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                          Text('Bienvenido, Wilmer', style: TextStyle(color: Colors.white54)),
+                          Row(
+                            children: [
+                              Image.asset('assets/logo_original.png', height: 40),
+                              const SizedBox(width: 12),
+                              Text(
+                                'ORBIT',
+                                style: GoogleFonts.orbitron(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 4,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Text(
+                            'OPERACIONES DE CLOUD',
+                            style: TextStyle(color: Colors.cyanAccent, fontSize: 10, letterSpacing: 2),
+                          ),
                         ],
                       ),
-                      CircleAvatar(
-                        backgroundColor: Colors.deepPurple,
-                        child: const Icon(Icons.person, color: Colors.white),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.cyanAccent, width: 2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 10),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black,
+                          child: const Icon(Icons.person, color: Colors.cyanAccent),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 40),
-                  const Text('MIS PLANETAS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+                  Text(
+                    'PLANETAS ACTIVOS',
+                    style: GoogleFonts.orbitron(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: ListView.builder(
                       itemCount: myPlanets.length,
-                      itemBuilder: (context, index) => _buildPlanetCard(myPlanets[index]),
+                      itemBuilder: (context, index) => _buildGlassPlanetCard(myPlanets[index]),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -104,20 +163,44 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildPlanetCard(PlanetInstance planet) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListTile(
-        leading: const Icon(Icons.public, color: Colors.cyanAccent),
-        title: Text(planet.name),
-        subtitle: Text(planet.url, style: const TextStyle(fontSize: 10, color: Colors.white30)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CockpitView(planet: planet)),
-          );
-        },
+  Widget _buildGlassPlanetCard(PlanetInstance planet) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.public, color: Colors.cyanAccent.withOpacity(0.3), size: 40),
+                const Icon(Icons.hub_outlined, color: Colors.cyanAccent, size: 24),
+              ],
+            ),
+            title: Text(
+              planet.name,
+              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+            ),
+            subtitle: Text(
+              planet.url,
+              style: const TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.cyanAccent, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CockpitView(planet: planet)),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -127,17 +210,33 @@ class _HomeDashboardState extends State<HomeDashboard> {
       width: double.infinity,
       height: 60,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Colors.deepPurple, Colors.blueAccent]),
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.cyanAccent.withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+          ),
         ),
         onPressed: _deployNewPlanet,
-        child: const Text('DEPLOY NEW PLANET', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        child: Text(
+          'DESPLEGAR NUEVO PLANETA',
+          style: GoogleFonts.orbitron(
+            fontWeight: FontWeight.bold,
+            color: Colors.cyanAccent,
+            letterSpacing: 2,
+          ),
+        ),
       ),
     );
   }
@@ -161,7 +260,7 @@ class _CockpitViewState extends State<CockpitView> {
   double loadingProgress = 0;
   
   String agentStatus = "OFFLINE";
-  String currentTask = "No active connection";
+  String currentTask = "Sin conexión activa";
 
   @override
   void initState() {
@@ -189,7 +288,6 @@ class _CockpitViewState extends State<CockpitView> {
 
   void _initMcpConnection() {
     final host = widget.planet.url.split(':').first;
-    // Token Mocked para Fase 4 Hardening (sub: orbit_commander)
     const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvcmJpdF9jb21tYW5kZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.XPb_tU6u_k5_m5-yL9y-D8p-x_S-v_T-v_T-v_T-v_T"; 
     final mcpUrl = 'ws://$host:8000/ws/mcp?token=$mockToken';
     
@@ -212,7 +310,10 @@ class _CockpitViewState extends State<CockpitView> {
   void _panicAction() {
     mcpChannel?.sink.add(json.encode({"type": "HALT_SIGNAL"}));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(backgroundColor: Colors.red, content: Text('SISTEMA CONGELADO: Señal de Pánico Enviada')),
+      const SnackBar(
+        backgroundColor: Colors.red,
+        content: Text('SISTEMA CONGELADO: Señal de Pánico Enviada'),
+      ),
     );
   }
 
@@ -227,8 +328,12 @@ class _CockpitViewState extends State<CockpitView> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(widget.planet.name, style: const TextStyle(fontSize: 14)),
-        backgroundColor: Colors.transparent,
+        title: Text(
+          widget.planet.name.toUpperCase(),
+          style: GoogleFonts.orbitron(fontSize: 12, letterSpacing: 2, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.black87,
+        elevation: 0,
         actions: [
           IconButton(
             icon: Icon(Icons.analytics_outlined, color: showStatusDeck ? Colors.cyanAccent : Colors.white),
@@ -246,7 +351,8 @@ class _CockpitViewState extends State<CockpitView> {
           SafeArea(
             child: Column(
               children: [
-                if (loadingProgress < 1) LinearProgressIndicator(value: loadingProgress, color: Colors.cyanAccent),
+                if (loadingProgress < 1) 
+                  LinearProgressIndicator(value: loadingProgress, color: Colors.cyanAccent, backgroundColor: Colors.black),
                 _buildStatusStrip(),
                 Expanded(child: WebViewWidget(controller: controller)),
                 if (showStatusDeck) _buildAgentStatusDeck(),
@@ -261,60 +367,114 @@ class _CockpitViewState extends State<CockpitView> {
 
   Widget _buildStatusStrip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: Colors.black45,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: const BoxDecoration(
+        color: Colors.black,
+        border: Border(bottom: BorderSide(color: Colors.white12, width: 0.5)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: agentStatus == "HALTED" ? Colors.red : Colors.greenAccent, shape: BoxShape.circle)),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: agentStatus == "HALTED" ? Colors.red : Colors.greenAccent,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: agentStatus == "HALTED" ? Colors.red : Colors.greenAccent,
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
-              Text('AGENT: $agentStatus', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              Text(
+                'AGENTE: $agentStatus',
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
             ],
           ),
-          const Text('LATENCIA: 12ms', style: TextStyle(fontSize: 10, color: Colors.cyanAccent)),
+          const Text(
+            'LNK: ESTABLE [12ms]',
+            style: TextStyle(fontSize: 9, color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildAgentStatusDeck() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(color: Color(0xFF0D1117), border: Border(top: BorderSide(color: Colors.cyanAccent))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('MISSION CONTROL TELEMETRY', style: TextStyle(fontSize: 10, color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(currentTask, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
-        ],
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D1117).withOpacity(0.9),
+            border: const Border(top: BorderSide(color: Colors.cyanAccent, width: 0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'TELEMETRÍA DE CONTROL DE MISIÓN',
+                style: GoogleFonts.orbitron(fontSize: 10, color: Colors.cyanAccent, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                currentTask.toUpperCase(),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildDevKeyboard() {
     return Container(
-      padding: const EdgeInsets.all(8),
-      color: const Color(0xFF020205),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      decoration: const BoxDecoration(
+        color: Color(0xFF020205),
+        border: Border(top: BorderSide(color: Colors.white12)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _DevKeyShort(label: 'ESC'), _DevKeyShort(label: 'CTRL'), _DevKeyShort(label: 'ALT'), _DevKeyShort(label: 'TAB'),
+              _DevKeyShort(label: 'ESC'),
+              _DevKeyShort(label: 'CTRL'),
+              _DevKeyShort(label: 'ALT'),
+              _DevKeyShort(label: 'TAB'),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade900),
+            height: 50,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.warning_amber_rounded, size: 20),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade900.withOpacity(0.3),
+                foregroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Colors.redAccent, width: 1),
+                ),
+              ),
               onPressed: _panicAction,
-              child: const Text('EMERGENCY PANIC', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: Text(
+                'PÁNICO DE EMERGENCIA',
+                style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              ),
             ),
           ),
         ],
@@ -325,7 +485,22 @@ class _CockpitViewState extends State<CockpitView> {
 
 class _DevKeyShort extends StatelessWidget {
   final String label;
-        ),
+  const _DevKeyShort({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
       ),
     );
   }

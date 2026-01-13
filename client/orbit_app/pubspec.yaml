@@ -11,6 +11,7 @@ dependencies:
   webview_flutter: ^4.4.2
   web_socket_channel: ^2.4.0
   cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -19,3 +20,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/logo_original.png
+    - assets/bg_mission_control.png
