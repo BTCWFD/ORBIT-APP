@@ -73,8 +73,41 @@ class _CockpitViewState extends State<CockpitView> {
 
   void _connect() {
     if (urlController.text.isNotEmpty) {
-      controller.loadRequest(Uri.parse(urlController.text));
+      String url = urlController.text;
+      if (!url.startsWith('http')) {
+        url = 'https://$url';
+      }
+      controller.loadRequest(Uri.parse(url));
     }
+  }
+
+  void _panicAction() {
+    // Lógica de Pánico: Simulación de parada de emergencia de agentes.
+    // En la Fase 2, esto enviará una señal via MCP (Model Context Protocol).
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade900,
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.white),
+            SizedBox(width: 10),
+            Text('PROTOCOLO DE PÁNICO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Se ha enviado una señal de interrupción inmediata a todos los agentes activos en el Planeta. '
+          'La ejecución se ha congelado.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ENTENDIDO', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -83,7 +116,7 @@ class _CockpitViewState extends State<CockpitView> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('ORBIT COCKPIT v1.0', 
-          style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold, fontSize: 14)),
+          style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold, fontSize: 13)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: ClipRect(
@@ -94,11 +127,11 @@ class _CockpitViewState extends State<CockpitView> {
         ),
         actions: [
           IconButton(
-            icon: Icon(showKeyboard ? Icons.keyboard_hide : Icons.keyboard),
+            icon: Icon(showKeyboard ? Icons.keyboard_hide : Icons.keyboard, color: Colors.cyanAccent),
             onPressed: () => setState(() => showKeyboard = !showKeyboard),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white70),
             onPressed: () => controller.reload(),
           ),
         ],
@@ -120,12 +153,23 @@ class _CockpitViewState extends State<CockpitView> {
             child: Column(
               children: [
                 if (loadingProgress > 0 && loadingProgress < 1)
-                  LinearProgressIndicator(value: loadingProgress, color: Colors.cyan),
+                  LinearProgressIndicator(
+                    value: loadingProgress, 
+                    backgroundColor: Colors.white10,
+                    color: Colors.cyanAccent
+                  ),
                 
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(isConnected ? 0 : 20),
-                    child: WebViewWidget(controller: controller),
+                  child: Container(
+                    margin: isConnected ? EdgeInsets.zero : const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      border: isConnected ? null : Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
+                      borderRadius: isConnected ? BorderRadius.zero : BorderRadius.circular(20),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: isConnected ? BorderRadius.zero : BorderRadius.circular(20),
+                      child: WebViewWidget(controller: controller),
+                    ),
                   ),
                 ),
                 
@@ -142,52 +186,70 @@ class _CockpitViewState extends State<CockpitView> {
 
   Widget _buildConnectionOverlay() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                border: Border.all(color: Colors.white12),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.language, size: 48, color: Colors.cyanAccent),
-                  const SizedBox(height: 20),
-                  const Text('ENLACE DE SATÉLITE', 
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: urlController,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.black26,
-                      labelText: 'URL del Planeta (VNC Server)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      prefixIcon: const Icon(Icons.link),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  border: Border.all(color: Colors.cyanAccent.withOpacity(0.2)),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.rocket_launch, size: 64, color: Colors.cyanAccent),
+                    const SizedBox(height: 20),
+                    const Text('ENLACE DE SATÉLITE', 
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                    const SizedBox(height: 10),
+                    Text('Proyecto Orbit v1.0', 
+                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.5))),
+                    const SizedBox(height: 32),
+                    TextField(
+                      controller: urlController,
+                      style: const TextStyle(color: Colors.cyanAccent),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.black26,
+                        labelText: 'URL del Planeta (Cloudflare / Local)',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.cyanAccent),
+                        ),
+                        prefixIcon: const Icon(Icons.link, color: Colors.cyanAccent),
                       ),
-                      onPressed: _connect,
-                      child: const Text('CONECTAR AL SISTEMA', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyanAccent,
+                          foregroundColor: Colors.black,
+                          elevation: 10,
+                          shadowColor: Colors.cyanAccent.withOpacity(0.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _connect,
+                        child: const Text('INICIAR SECUENCIA DE CONEXIÓN', 
+                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Asegúrate de que el túnel esté activo en Docker',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: Colors.white38)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -198,10 +260,11 @@ class _CockpitViewState extends State<CockpitView> {
 
   Widget _buildDevKeyboard() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
-        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10, offset: const Offset(0, -2))],
+        color: const Color(0xFF0D1117),
+        border: Border(top: BorderSide(color: Colors.cyanAccent.withOpacity(0.2))),
+        boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -210,33 +273,47 @@ class _CockpitViewState extends State<CockpitView> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _DevKey(label: 'ESC', color: Colors.redAccent.withOpacity(0.8), onPressed: () {}),
+                _DevKey(label: 'ESC', color: Colors.redAccent.withOpacity(0.2), onPressed: () {}),
                 _DevKey(label: 'CTRL', onPressed: () {}),
                 _DevKey(label: 'ALT', onPressed: () {}),
                 _DevKey(label: 'TAB', onPressed: () {}),
                 _DevKey(label: 'CMD', onPressed: () {}),
+                _DevKey(label: 'P', color: Colors.cyanAccent.withOpacity(0.1), onPressed: () {}), // Ctrl+P sim
                 _DevKey(label: 'F1', onPressed: () {}),
                 _DevKey(label: 'F12', onPressed: () {}),
                 _DevKey(label: '/', onPressed: () {}),
                 _DevKey(label: '|', onPressed: () {}),
-                _DevKey(label: '-', onPressed: () {}),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withOpacity(0.9),
-                      foregroundColor: Colors.white,
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.2),
+                          blurRadius: 10,
+                          spreadRadius: 1
+                        )
+                      ]
                     ),
-                    onPressed: () {},
-                    icon: const Icon(Icons.stop_circle),
-                    label: const Text('PÁNICO / HALT'),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade900,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 5,
+                      ),
+                      onPressed: _panicAction,
+                      icon: const Icon(Icons.bolt, color: Colors.yellowAccent),
+                      label: const Text('PROTOCOLO DE PÁNICO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                   ),
                 ),
               ),
