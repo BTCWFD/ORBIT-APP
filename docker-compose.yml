@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  planet:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: orbit-planet
+    image: orbit-planet:latest
+    ports:
+      - "6901:6901" # KasmVNC (Control de Misión)
+      - "8080:8080" # code-server (Acceso directo IDE opcional)
+    volumes:
+      - orbit_data:/home/orbituser
+    restart: unless-stopped
+
+volumes:
+  orbit_data:
