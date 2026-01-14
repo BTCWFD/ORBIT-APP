@@ -5,7 +5,7 @@ set -e
 mkdir -p /home/orbituser/.vnc
 
 # Configuración de credenciales (Usando variables de entorno para Hardening)
-echo "$VNC_PASSWORD" | vncpasswd -f > /home/orbituser/.vnc/passwd
+echo -e "$VNC_PASSWORD\n$VNC_PASSWORD\n" | vncpasswd -u orbituser /home/orbituser/.vnc/passwd
 chmod 600 /home/orbituser/.vnc/passwd
 
 # Generar certificado auto-firmado para HTTPS (requerido por KasmVNC)
