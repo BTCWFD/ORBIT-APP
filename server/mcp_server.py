@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Dict, Any, Optional
 from enum import Enum
 from pydantic import BaseModel, ValidationError
@@ -8,22 +9,29 @@ import jwt
 import asyncio
 import logging
 from dotenv import load_dotenv
+
+# Load env before importing services that use it
+load_dotenv()
+
 from services.ai_service import ai_brain
 
 # --- CONFIGURATION & LOGGING ---
-load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("Orbit.MCPServer")
 
 class Settings:
-    SECRET_KEY: str = os.getenv("MCP_SECRET", "changeme_in_prod_critical_warning")
+    SECRET_KEY: str = os.getenv("MCP_SECRET")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-settings = Settings()
+    def validate(self):
+        if not self.SECRET_KEY or self.SECRET_KEY == "changeme":
+            logger.critical("🚨 SECURITY FATAL: MCP_SECRET is missing or unsafe. Server refusing to start.")
+            sys.exit(1)
 
-if settings.SECRET_KEY == "changeme_in_prod_critical_warning":
-    logger.warning("⚠️  RUNNING WITH DEFAULT INSECURE SECRET KEY. SET 'MCP_SECRET' IN ENV.")
+settings = Settings()
+# Validate settings on startup
+settings.validate()
 
 # --- DOMAIN MODELS (DDD) ---
 class AgentStatus(str, Enum):
@@ -135,7 +143,7 @@ async def websocket_endpoint(
                     # Implement logic to kill subprocesses here
 
                 elif message.type == "AI_PROMPT":
-                    # Non-blocking AI processing (in real implementation, use threadpool)
+                    # Non-blocking AI processing (Async Stream)
                     user_text = message.payload.get("text", "")
                     logger.info(f"🧠 Thinking about: {user_text}")
                     
@@ -143,12 +151,20 @@ async def websocket_endpoint(
                     await state_manager.update(status=AgentStatus.BUSY, current_task="Procesando consulta IA...")
                     await manager.broadcast_state(state_manager._state)
 
-                    # Simpler for POC: Await directly (blocks event loop briefly, optimize later)
-                    response_text = ai_brain.process_prompt(user_text)
+                    response_buffer = []
+                    
+                    # Consuming the stream asynchronously
+                    # This allows the event loop to handle other messages/connections in between chunks
+                    async for token in ai_brain.process_prompt_stream(user_text):
+                        response_buffer.append(token)
+                        # Optional: Send intermediate tokens if Client supports it
+                        # await websocket.send_json({"type": "AI_TOKEN", "data": token}) 
+
+                    final_response = "".join(response_buffer)
                     
                     await websocket.send_json({
                         "type": "AI_RESPONSE", 
-                        "data": {"text": response_text}
+                        "data": {"text": final_response}
                     })
 
                     # Back to IDLE
@@ -172,4 +188,5 @@ async def websocket_endpoint(
 
 if __name__ == "__main__":
     import uvicorn
+    # Use environment variables for host/port in production
     uvicorn.run(app, host="0.0.0.0", port=8000)
