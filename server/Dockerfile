@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip node.js npm \
     && apt-get clean
 
-RUN pip3 install fastapi uvicorn pyjwt python-dotenv
+# Install python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 # Install KasmVNC
 RUN wget https://github.com/kasmtech/KasmVNC/releases/download/v1.3.1/kasmvncserver_jammy_1.3.1_amd64.deb \
@@ -22,7 +24,8 @@ RUN wget https://github.com/kasmtech/KasmVNC/releases/download/v1.3.1/kasmvncser
 # Setup User
 RUN useradd -m -s /bin/bash orbituser && \
     echo "orbituser:orbitpassword" | chpasswd && \
-    adduser orbituser sudo
+    echo "orbituser:orbitpassword" | chpasswd
+# REMOVED: adduser orbituser sudo (Security Hardening)
 
 # Setup VS Code (code-server)
 RUN curl -fsSL https://code-server.dev/install.sh | sh

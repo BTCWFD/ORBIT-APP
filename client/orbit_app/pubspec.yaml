@@ -23,3 +23,4 @@ flutter:
   assets:
     - assets/logo_original.png
     - assets/bg_mission_control.png
+    - assets/client.p12 # mTLS Identity

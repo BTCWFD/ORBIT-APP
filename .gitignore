@@ -9,3 +9,8 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
+# Secrets & Keys
+cloud/gateway/certs/
+client/orbit_app/assets/client.p12
+server/.env
+.env

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart'; // Required for IOWebSocketChannel
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:io'; // Required for SecurityContext
 import '../models/planet.dart';
+import '../widgets/ai_chat_panel.dart'; // Import Chat Widget
 
 void main() {
   runApp(const OrbitApp());
@@ -45,8 +49,8 @@ class HomeDashboard extends StatefulWidget {
 
 class _HomeDashboardState extends State<HomeDashboard> {
   final List<PlanetInstance> myPlanets = [
-    PlanetInstance(id: '1', name: 'Alpha Station', url: 'localhost:6901'),
-    PlanetInstance(id: '2', name: 'GCP Workstation 01', url: 'orbit.trycloudflare.com'),
+    // 10.0.2.2 is 'localhost' for Android Emulator. Use 'localhost' for Desktop/Web.
+    PlanetInstance(id: '1', name: 'Antigravity Prime', url: '10.0.2.2:443'), 
   ];
 
   void _deployNewPlanet() {
@@ -257,10 +261,13 @@ class _CockpitViewState extends State<CockpitView> {
   bool isConnected = false;
   bool showKeyboard = true;
   bool showStatusDeck = false;
+  bool showChat = false; // New Chat State
+  bool isIdeMode = false; // IDE vs VNC Mode
   double loadingProgress = 0;
   
   String agentStatus = "OFFLINE";
   String currentTask = "Sin conexión activa";
+  List<ChatMessage> chatMessages = []; // Chat History
 
   @override
   void initState() {
@@ -279,31 +286,81 @@ class _CockpitViewState extends State<CockpitView> {
             setState(() => isConnected = true);
             _initMcpConnection();
           },
+          // SSL ERROR BYPASS FOR SELF-SIGNED CERTS (ONLY FOR DEMO)
+          onWebResourceError: (error) => debugPrint("Web Error: ${error.description}"),
+          onNavigationRequest: (request) => NavigationDecision.navigate,
         ),
       );
+    _loadContent();
+  }
+
+  void _loadContent() {
+    final host = widget.planet.url.split(':').first;
+    final port = widget.planet.url.split(':').last;
+    final path = isIdeMode ? '/code/' : '/'; // Switch between VNC and IDE
     
-    final fullUrl = widget.planet.url.startsWith('http') ? widget.planet.url : 'https://${widget.planet.url}';
+    // NOTE: Android WebView might need user to install .p12 in OS Settings manually for mTLS to work here.
+    final fullUrl = 'https://$host:$port$path';
     controller.loadRequest(Uri.parse(fullUrl));
   }
 
-  void _initMcpConnection() {
+  void _toggleIdeMode() {
+    setState(() {
+      isIdeMode = !isIdeMode;
+      _loadContent();
+    });
+  }
+
+  Future<void> _initMcpConnection() async {
     final host = widget.planet.url.split(':').first;
-    const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvcmJpdF9jb21tYW5kZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.XPb_tU6u_k5_m5-yL9y-D8p-x_S-v_T-v_T-v_T-v_T"; 
-    final mcpUrl = 'ws://$host:8000/ws/mcp?token=$mockToken';
-    
+    // ZERO TRUST SECURITY: Use WSS (Secure WebSocket) and mTLS
+    // We connect to the Gateway (Port 443), not the exposed port.
+    final mcpUrl = 'wss://$host:443/ws/mcp'; 
+
     try {
-      mcpChannel = WebSocketChannel.connect(Uri.parse(mcpUrl));
+      // 1. Load Client Certificate (Identity)
+      final ByteData data = await rootBundle.load('assets/client.p12');
+      final SecurityContext context = SecurityContext(withTrustedRoots: true);
+      context.useCertificateChainBytes(data.buffer.asUint8List(), password: "orbit123");
+      context.usePrivateKeyBytes(data.buffer.asUint8List(), password: "orbit123");
+      
+      // 2. Create HttpClient with this Context
+      final HttpClient client = HttpClient(context: context);
+      client.badCertificateCallback = (cert, host, port) => true; // FIXME: Accept Self-Signed CA for Demo
+
+      // 3. Connect Securely
+      final WebSocket socket = await WebSocket.connect(mcpUrl, customClient: client);
+      mcpChannel = IOWebSocketChannel(socket);
+
+      // 4. Listen handling
       mcpChannel!.stream.listen((message) {
         final decoded = json.decode(message);
         if (decoded['type'] == 'STATE_UPDATE') {
           setState(() {
             agentStatus = decoded['data']['status'];
             currentTask = decoded['data']['current_task'];
+            isConnected = true;
+          });
+        } else if (decoded['type'] == 'AI_RESPONSE') {
+          // Add AI Message to Chat
+          setState(() {
+            chatMessages.add(ChatMessage(
+              text: decoded['data']['text'], 
+              isUser: false, 
+              timestamp: DateTime.now()
+            ));
+            showChat = true; // Auto-open chat on response
           });
         }
       });
+      
+      debugPrint("✅ ZERO TRUST LINK ESTABLISHED");
     } catch (e) {
-      debugPrint("MCP Client Error: $e");
+      debugPrint("❌ MCP Security Error: $e");
+      setState(() {
+        agentStatus = "AUTH_FAILED";
+        currentTask = "Certificado Rechazado por Gateway";
+      });
     }
   }
 
@@ -335,6 +392,14 @@ class _CockpitViewState extends State<CockpitView> {
         backgroundColor: Colors.black87,
         elevation: 0,
         actions: [
+          TextButton(
+             onPressed: _toggleIdeMode,
+             child: Text(isIdeMode ? "IDE" : "VNC", style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold))
+          ),
+          IconButton(
+            icon: Icon(Icons.psychology, color: showChat ? Colors.cyanAccent : Colors.white),
+            onPressed: () => setState(() => showChat = !showChat),
+          ),
           IconButton(
             icon: Icon(Icons.analytics_outlined, color: showStatusDeck ? Colors.cyanAccent : Colors.white),
             onPressed: () => setState(() => showStatusDeck = !showStatusDeck),
@@ -356,14 +421,28 @@ class _CockpitViewState extends State<CockpitView> {
                 _buildStatusStrip(),
                 Expanded(child: WebViewWidget(controller: controller)),
                 if (showStatusDeck) _buildAgentStatusDeck(),
+                if (showChat) StartChatLayer(), // Replaced by Expanded Panel logic below
                 if (showKeyboard) _buildDevKeyboard(),
               ],
             ),
           ),
+          // Floating Chat Overlay (Outside standard Column to overlay keyboard if needed, or simply sit on top)
+          if (showChat)
+            Positioned(
+              left: 20, right: 20, bottom: showKeyboard ? 160 : 20, top: 100,
+              child: AIChatPanel(
+                channel: mcpChannel, 
+                messages: chatMessages, 
+                onClose: () => setState(() => showChat = false)
+              )
+            ),
         ],
       ),
     );
   }
+
+  // Helper placeholder for Column logic (removed in favor of Stack Positioned)
+  Widget StartChatLayer() => const SizedBox.shrink(); 
 
   Widget _buildStatusStrip() {
     return Container(

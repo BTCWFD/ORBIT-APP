@@ -7,10 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: orbit-planet
     image: orbit-planet:latest
-    ports:
-      - "6901:6901" # KasmVNC (Control de Misión local)
-      - "8080:8080" # code-server (Acceso IDE local)
-      - "8000:8000" # MCP Server (API Agéntica)
+    # ports:
+    #   - "6901:6901" # REMOVED: Direct Access blocked. Use Gateway.
     volumes:
       - orbit_data:/home/orbituser
     environment:
@@ -20,15 +18,22 @@ services:
     networks:
       - orbit_net
 
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: orbit-tunnel
-    command: tunnel --no-autoupdate run --url https://planet:6901 --no-tls-verify
-    restart: unless-stopped
-    networks:
-      - orbit_net
+  gateway:
+    image: nginx:alpine
+    container_name: orbit-gateway
+    ports:
+      - "443:443" # Only Secure HTTPS/WSS allowed
+    volumes:
+      - ./cloud/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./cloud/gateway/certs:/etc/nginx/certs:ro
     depends_on:
       - planet
+    networks:
+      - orbit_net
+  # tunnel:
+  #   # REMOVED: Insecure Cloudflare Tunnel (Phase 3: Zero Trust)
+  #   # image: cloudflare/cloudflared:latest
+  #   # ...
 
 networks:
   orbit_net:
