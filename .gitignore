@@ -1,16 +1,32 @@
-.env
-*.log
-orbit_data/
-__pycache__/
-*.pyc
+# Ignore IDE files
+/.idea/
+*.iml
+
+# Flutter / Dart
+client/orbit_app/.dart_tool/
+client/orbit_app/build/
+client/orbit_app/.metadata
+client/orbit_app/.gradle/
+client/orbit_app/.flutter-plugins
+client/orbit_app/.flutter-plugins-dependencies
+
+# Android
+client/orbit_app/android/.gradle/
+client/orbit_app/android/app/build/
+client/orbit_app/android/local.properties
+
+# iOS
+client/orbit_app/ios/Pods/
+client/orbit_app/ios/Runner.xcworkspace/
+client/orbit_app/ios/Podfile.lock
+
+# Misc
 .DS_Store
-build/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-# Secrets & Keys
-cloud/gateway/certs/
-client/orbit_app/assets/client.p12
-server/.env
-.env
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
