@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart'; // Required for IOWebSocketChannel
 import 'package:flutter/services.dart' show rootBundle;
+import 'dart:typed_data';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'dart:convert';
