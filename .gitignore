@@ -30,3 +30,17 @@ Thumbs.db
 # Coverage
 coverage/
 
+# Sensitive files and compiled artifacts
+cloud/gateway/certs/
+*.p12
+.env
+server/.env
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore Flutter pubspec lock optionally if you don't want to commit it
+client/orbit_app/pubspec.lock
